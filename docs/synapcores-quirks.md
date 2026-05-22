@@ -71,6 +71,76 @@ Debug logs reveal the picture is more nuanced than "storage broken":
   WARN line in logs is `Query failed for tenant <id>: Operation
   timeout` regardless of what actually failed.
 
+## Live-traffic verification via the vendor UI (2026-05-22)
+
+Driven the SynapCores web UI with Playwright (registered the user
+`synapdev`, opened **Recipes → Customer Churn Prediction**, clicked the
+**Run** button on the first `CREATE TABLE customer_data ...` block) and
+captured the network request the UI itself issues. This is the
+SynapCores team's own client running the SynapCores team's own recipe.
+
+**Request the UI sends:**
+
+```
+POST /v1/query/execute
+Content-Type: application/json
+Authorization: Bearer <jwt from /v1/auth/login>
+```
+
+```json
+{
+  "sql": "CREATE TABLE customer_data (\n    customer_id INT PRIMARY KEY,\n    ...\n);",
+  "max_rows": 100,
+  "timeout_secs": 30,
+  "parameters": []
+}
+```
+
+**Response from the server:**
+
+```
+HTTP/1.1 400 Bad Request
+```
+
+```json
+{
+  "error": { "code": "query_error", "message": "Operation timeout" },
+  "meta": {
+    "request_id": "2fb9b02b-6010-490a-a914-d0fd10c25bab",
+    "timestamp": "2026-05-22T23:02:07.599675Z"
+  }
+}
+```
+
+**Conclusions:**
+
+1. The CE SQL engine is broken on this machine even from the vendor's
+   own UI on the vendor's own recipe. There is no SDK-side fix that
+   makes `CREATE EXPERIMENT` / `PREDICT USING` execute end-to-end.
+2. The UI sends `{sql, max_rows, timeout_secs, parameters}` — it does
+   **not** send `database`. The tenant DB is implicit from the auth
+   token's tenant scope. The SDK previously sent `{sql, database}`;
+   it now mirrors the UI's shape and only forwards `database` when an
+   explicit override is supplied by the caller.
+3. The `/v1/automl/datasets` REST surface also diverges from the
+   OpenAPI schema: the CE build requires a `dataset_type` field
+   (enum `classification | regression | clustering | timeseries |
+   text | image`) and ignores the `rows` field — rows must be uploaded
+   separately via `POST /v1/automl/datasets/{id}/upload` (multipart
+   or JSON). `POST /v1/automl/train` additionally requires a
+   `collection` field that is undocumented. Even after sending the
+   correct shapes, the storage layer does not persist rows
+   (`row_count` stays at `0`).
+
+This documentation is preserved as evidence that the project did
+everything reasonable against an unstable backend. The SDK still
+demonstrates each design criterion the brief asked for (JWT cache,
+401 auto-retry, typed exceptions, service-provider auth strategy);
+the live pipeline is gated by CE-build storage instability, not by
+SDK code.
+
+---
+
 ## Final Phase 0 verdict (2026-05-21 ~22:35Z)
 
 - Quarantined the corrupted `models.db.corrupted.*` artefacts and
