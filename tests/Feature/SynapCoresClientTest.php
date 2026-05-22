@@ -109,7 +109,13 @@ class SynapCoresClientTest extends TestCase
         Http::assertSent(function (\Illuminate\Http\Client\Request $req): bool {
             return $req->url() === 'http://synapcores.test/v1/query/execute'
                 && $req->method() === 'POST'
-                && $req->body() === json_encode(['sql' => 'SELECT 1', 'database' => 'main'])
+                && $req->body() === json_encode([
+                    'sql'          => 'SELECT 1',
+                    'max_rows'     => 100,
+                    'timeout_secs' => 5,
+                    'parameters'   => [],
+                    'database'     => 'main',
+                ])
                 && $req->hasHeader('Authorization', 'ApiKey my-key-123');
         });
     }

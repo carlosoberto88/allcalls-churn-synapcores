@@ -52,13 +52,26 @@ final class SynapCoresClient implements SynapCoresClientInterface
      */
     public function query(string $sql, ?string $database = null): QueryResult
     {
+        // Body shape verified by capturing the SynapCores web UI's own /v1/query/execute
+        // request via Playwright (2026-05-22). The UI sends {sql, max_rows, timeout_secs,
+        // parameters} and does NOT send `database` — the tenant DB is implicit from the
+        // auth token. We accept a $database arg for forward compatibility but only forward
+        // it when the caller passes one, matching the UI's "omit" default.
+        $body = [
+            'sql'          => $sql,
+            'max_rows'     => 100,
+            'timeout_secs' => $this->timeoutSeconds,
+            'parameters'   => [],
+        ];
+
+        if ($database !== null) {
+            $body['database'] = $database;
+        }
+
         $response = $this->send(
             method: 'post',
             path: '/v1/query/execute',
-            body: [
-                'sql'      => $sql,
-                'database' => $database ?? $this->defaultDatabase,
-            ],
+            body: $body,
         );
 
         $body = $response->json() ?? [];
