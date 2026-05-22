@@ -34,38 +34,21 @@ CE build — the only flags are `-c <config>`, `-l <log-level>`, `--show-license
 `--accept-license`. See [docs/synapcores-quirks.md](docs/synapcores-quirks.md) for the full set
 of discrepancies between docs and runtime.
 
-Once the server is up, create a user and mint an API key:
+Once the server is up, create your user and API key entirely through the web UI:
 
-1. **Create the first user via the web UI.** Open `http://127.0.0.1:8080` in a browser and use
-   the on-screen registration form to create an account. The CE build does not ship with a
-   default admin user and there is no `POST /v1/users` register endpoint exposed without auth
-   — the UI is the only way to bootstrap the first account.
+1. **Open `http://127.0.0.1:8080`** in a browser.
+2. **Register the first user** with the on-screen registration form. The CE build does not ship
+   with a default admin user; the UI is the only way to bootstrap an account.
+3. **Log in** with those credentials.
+4. **Go to Settings → API Keys**, click *Create API key*, give it any name, and choose
+   permission **FullAccess**. Copy the `aidb_…` value the UI shows you — it is displayed once.
 
-2. **Log in via the API** with the credentials you just created:
-
-   ```bash
-   curl -s -X POST http://127.0.0.1:8080/v1/auth/login \
-     -H 'Content-Type: application/json' \
-     -d '{"username":"<your-username>","password":"<your-password>"}'
-   # → {"access_token":"<jwt>","token_type":"Bearer","expires_in":3600}
-   ```
-
-   Note: the OpenAPI schema says `email` but the runtime requires `username`.
-
-3. **Mint a FullAccess API key** with that JWT:
-
-   ```bash
-   curl -s -X POST http://127.0.0.1:8080/v1/api-keys \
-     -H 'Authorization: Bearer <jwt>' \
-     -H 'Content-Type: application/json' \
-     -d '{"name":"churn-app","permission":"FullAccess"}'
-   # → {"api_key":"aidb_…"}
-   ```
-
-   Note: the schema says `scopes` but the runtime wants `permission` (`ReadOnly` or `FullAccess`).
-
-Copy the returned `api_key` into `.env` as `SYNAPCORES_API_KEY`. The SDK sends it as
+Paste that value into `.env` as `SYNAPCORES_API_KEY`. The SDK sends it as
 `Authorization: ApiKey <key>` — neither `Bearer` nor `X-API-Key` works on this build.
+
+> The REST endpoints `POST /v1/auth/login` and `POST /v1/api-keys` exist and the SDK uses them
+> (the JWT path is fully implemented), but bootstrapping the *first* account via curl is not
+> possible on the CE build — there is no unauthenticated user-registration endpoint exposed.
 
 ---
 
