@@ -16,6 +16,44 @@ auto-retry — there is no official PHP client for SynapCores.
 - SynapCores Community Edition running locally on `http://127.0.0.1:8080`
 - An API key issued by `POST /v1/api-keys` on that SynapCores instance
 
+### Starting SynapCores
+
+Download the Community Edition binary from [synapcores.com](https://synapcores.com) and accept
+the license on first run:
+
+```bash
+synapcores --accept-license     # one-time
+synapcores                      # start the server (foreground)
+# or:
+synapcores -l debug             # start with debug logs
+```
+
+The binary reads `~/.synapcores/gateway.toml`. Port lives under `[server] listen_addr` and
+defaults to `0.0.0.0:8080`. The brief's `synapcores --port 8080` flag does **not** exist on the
+CE build — the only flags are `-c <config>`, `-l <log-level>`, `--show-license`,
+`--accept-license`. See [docs/synapcores-quirks.md](docs/synapcores-quirks.md) for the full set
+of discrepancies between docs and runtime.
+
+Once the server is up, bootstrap an admin user and mint an API key:
+
+```bash
+# 1. Login (the schema says "email" but the runtime requires "username")
+curl -s -X POST http://127.0.0.1:8080/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"<your-admin-password>"}'
+# → {"access_token":"<jwt>","token_type":"Bearer","expires_in":3600}
+
+# 2. Mint a FullAccess API key (the schema says "scopes" but runtime wants "permission")
+curl -s -X POST http://127.0.0.1:8080/v1/api-keys \
+  -H 'Authorization: Bearer <jwt>' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"churn-app","permission":"FullAccess"}'
+# → {"api_key":"aidb_…"}
+```
+
+Copy the returned `api_key` into `.env` as `SYNAPCORES_API_KEY`. The SDK sends it as
+`Authorization: ApiKey <key>` — neither `Bearer` nor `X-API-Key` works on this build.
+
 ---
 
 ## Quickstart
